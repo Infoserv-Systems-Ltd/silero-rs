@@ -1,0 +1,10 @@
+[package]
+name = "silero-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Rust bindings for silero's C++ wrapper"
+license = "Unlicense"
+documentation = "https://docs.rs/sileror-rs"
+repository = "https://github.com/Infoserv-Systems-Ltd/sileror-rs"
+
+[dependencies]

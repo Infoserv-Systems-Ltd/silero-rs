@@ -1,0 +1,3 @@
+# silero-rs - A Rust wrapper for teh Silero C++ library
+
+Placeholder....
