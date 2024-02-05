@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(unused_mut)]
+#![allow(dead_code)]
 //use onnxruntime::{environment::Environment, LoggingLevel, GraphOptimizationLevel, OrtError, session::{self, Input}};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -8,8 +9,9 @@ use rodio::{Decoder, Sample, Source, decoder::DecoderError};
 use std::fs::File;
 use std::io::BufReader;
 use std::error::Error;
-use ort::{Session, TensorElementType, ValueType, GraphOptimizationLevel, Tensor, CoreMLExecutionProvider};
-
+use ort::{Session, TensorElementType, ValueType, GraphOptimizationLevel, Tensor, CoreMLExecutionProvider, inputs};
+use rand::Rng;
+use ndarray::{Array1, Axis, array, concatenate, s};
 /*
 fn main() {
     
@@ -90,8 +92,9 @@ fn run(data_sample: Vec<i16>) -> Result<(), Box<dyn Error>> {
 fn main() {
     
     let model_location: &str = "/Users/oliver.pikett/Documents/SileroDev/my_work/files/silero_vad.onnx";
-    let model_info_result = get_model_info(&model_location);
+    //let model_info_result = get_model_info(&model_location);
 
+    /*
     match model_info_result {
         
         Ok(model_info) => {
@@ -102,8 +105,14 @@ fn main() {
             println!("{}", err);
         }
     }
+    */
+    let silero_info = get_model_info("/Users/oliver.pikett/Documents/SileroDev/my_work/files/silero_vad.onnx");
+    let gpt2_info = get_model_info("/Users/oliver.pikett/Documents/SileroDev/my_work/files/gpt2.onnx");
 
-    let audio_sample_result = get_audio("/Users/oliver.pikett/Documents/SileroDev/my_work/files/10-seconds.mp3");
+    let audio_sample_result = get_audio("/Users/oliver.pikett/Documents/SileroDev/my_work/files/10-seconds.mp3").unwrap();
+    run_model(&model_location, &audio_sample_result);
+
+    /*
     match audio_sample_result {
 
         Ok(audio_sample) => {
@@ -128,14 +137,21 @@ fn main() {
             std::process::exit(1);
         }
     }
+    */
 }
 
-fn get_audio(file_path: &str) -> Result<Vec<i16>, Box<dyn Error>> {
+fn get_audio(file_path: &str) -> Result<Vec<f32>, Box<dyn Error>> {
 
     let aud_file: File = File::open(file_path)?;
     let aud_decoder: Decoder<BufReader<File>> = Decoder::new(BufReader::new(aud_file))?;
     let aud_array: Vec<i16> = aud_decoder.collect();
-    Ok(aud_array)
+    let mut return_arr: Vec<f32> = Vec::new();
+
+    for item in aud_array {
+        return_arr.push(item as f32);
+    }
+
+    Ok(return_arr)
 }
 
 fn display_element_type(t: TensorElementType) -> &'static str {
@@ -175,7 +191,7 @@ fn display_value_type(value: &ValueType) -> String {
 	}
 }
 
-fn get_model_info(model_path: &str) -> Result<String, Box<dyn Error>>{
+fn get_model_info(model_path: &str) -> Result<(), Box<dyn Error>>{
 
     let session = Session::builder()?.with_model_from_file(model_path)?;
     let mut model_info = String::new();
@@ -203,40 +219,49 @@ fn get_model_info(model_path: &str) -> Result<String, Box<dyn Error>>{
         model_info.push_str(&format!(" {}\n", display_value_type(&output.output_type)));
 
 	}
-
-    Ok(model_info.to_string())
+    println!("{}", model_info.to_string());
+    Ok(())
 
 }
 
-fn run(model_location: &str, data_sample: &Vec<i16>) -> Result<(), Box<dyn Error>> {
+fn run_model(model_location: &str, data_sample: &Vec<f32>) -> ort::Result<()> {
 
     ort::init()
         .with_name("Silero-VAD")
         .with_execution_providers([CoreMLExecutionProvider::default().build()])
         .commit()?;
     
-    let session = Session::builder()?
+    let mut session = Session::builder()?
         .with_optimization_level(GraphOptimizationLevel::Level1)?
         .with_intra_threads(1)?
         .with_model_from_file(model_location);
 
-    let input_tensor = Tensor.create
 
     let test_arr = create_rand_array(10000);
-    println!("{}", test_arr.get(5000)?.to_string);
-    
-    Ok(())
+    println!("{:?}", test_arr.get(5000).unwrap());
 
+    let mut input_array = Array1::from_iter(data_sample.iter().cloned());
+    let array = input_array.view().insert_axis(Axis(0));
+    let binding = session?;
+    //not progressing past this line
+    let outputs = binding.run(inputs![array]?)?;
+	let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
+	let generated_tokens = generated_tokens.view();
+    println!("{}", generated_tokens.get(0).unwrap());
+
+    Ok(())
 
 }
 
-fn create_rand_array(length: i32) -> Vec<Vec<i16>> {
+fn create_rand_array(length: i32) -> Vec<(f32, f32)> {
 
-    let mut array_2d = vec![vec![0; length]; length];
+    let mut arr: Vec<(f32, f32)> = Vec::new();
+    let mut rng = rand::thread_rng();
     
     for i in 0..length {
-        for j in 0..length {
-            array_2d[i][j] = rng.gen_range(0..10001);
-        }
+        let int1: f32 = rng.gen_range(0..1000) as f32;
+        let int2: f32 = rng.gen_range(0..10000) as f32;
+        arr.push((int1, int2));
     }
+    return arr;
 }
