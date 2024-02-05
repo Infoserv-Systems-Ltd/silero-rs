@@ -220,6 +220,23 @@ fn run(model_location: &str, data_sample: &Vec<i16>) -> Result<(), Box<dyn Error
         .with_intra_threads(1)?
         .with_model_from_file(model_location);
 
+    let input_tensor = Tensor.create
 
+    let test_arr = create_rand_array(10000);
+    println!("{}", test_arr.get(5000)?.to_string);
+    
     Ok(())
+
+
+}
+
+fn create_rand_array(length: i32) -> Vec<Vec<i16>> {
+
+    let mut array_2d = vec![vec![0; length]; length];
+    
+    for i in 0..length {
+        for j in 0..length {
+            array_2d[i][j] = rng.gen_range(0..10001);
+        }
+    }
 }
