@@ -1,6 +1,6 @@
 # silero-rs - A Rust wrapper for the Silero C++ library
 
-## development 
+## Development 
 
 Run with
 ```
@@ -12,4 +12,4 @@ or for the binary direct
 silero_example --model <MODEL> --audio <AUDIO>
 ```
 
-where <MODEL> is teh path to the Silero model and <AUDIO> is the path to the audio 
+where <MODEL> is the path to the Silero model and <AUDIO> is the path to the audio 
