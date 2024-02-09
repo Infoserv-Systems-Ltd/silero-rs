@@ -8,9 +8,20 @@ documentation = "https://docs.rs/sileror-rs"
 repository = "https://github.com/Infoserv-Systems-Ltd/sileror-rs"
 
 [dependencies]
-onnxruntime = "0.0.14"
-ort = "1.16.3"
-rand = "0.8.5"
-rodio = "0.17.3"
-tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+anyhow = { version = "1.0.79" }
+clap = { version = "4.4.18", features = ["derive"] }
+ndarray = { version = "0.15" }
+# enable the line below when v2 of ORT is released
+# ort = {version = "2.0.0"}
+# or
+# ort = {version = "2.0.0", features = [ "fetch-models" ] }
+# not sure if the ndarray is needed below.....
+ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = [
+    "fetch-models",
+    "ndarray",
+#    "cuda"
+] }
+rand = { version = "0.8.5" }
+rodio = { version = "0.17.3" }
+tracing = { version = "0.1.40" }
+tracing-subscriber = { version = "0.3.18" }
