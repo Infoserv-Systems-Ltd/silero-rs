@@ -9,9 +9,11 @@ use rodio::{Decoder, Sample, Source, decoder::DecoderError};
 use std::fs::File;
 use std::io::BufReader;
 use std::error::Error;
-use ort::{Session, TensorElementType, ValueType, GraphOptimizationLevel, Tensor, CoreMLExecutionProvider, inputs};
+use ort::{Session, TensorElementType, ValueType, GraphOptimizationLevel, Tensor, CoreMLExecutionProvider, inputs, Value};
+//use ort::sys::{OrtAllocator, OrtMemoryInfo};
 use rand::Rng;
-use ndarray::{Array1, Axis, array, concatenate, s};
+use ndarray::{Array1, Axis, CowArray, IxDyn, array, concatenate, s};
+use std::convert::TryInto;
 /*
 fn main() {
     
@@ -107,10 +109,21 @@ fn main() {
     }
     */
     let silero_info = get_model_info("/Users/oliver.pikett/Documents/SileroDev/my_work/files/silero_vad.onnx");
-    let gpt2_info = get_model_info("/Users/oliver.pikett/Documents/SileroDev/my_work/files/gpt2.onnx");
+    //let gpt2_info = get_model_info("/Users/oliver.pikett/Documents/SileroDev/my_work/files/gpt2.onnx");
 
     let audio_sample_result = get_audio("/Users/oliver.pikett/Documents/SileroDev/my_work/files/10-seconds.mp3").unwrap();
-    run_model(&model_location, &audio_sample_result);
+    let model_result = run_model(&model_location, &audio_sample_result);
+
+    match model_result {
+        
+        Ok(_) => {
+            println!("Success");
+        }
+
+        Err(err) => {
+            println!("{}", err);
+        }
+    }
 
     /*
     match audio_sample_result {
@@ -236,15 +249,27 @@ fn run_model(model_location: &str, data_sample: &Vec<f32>) -> ort::Result<()> {
         .with_intra_threads(1)?
         .with_model_from_file(model_location);
 
-
-    let test_arr = create_rand_array(10000);
-    println!("{:?}", test_arr.get(5000).unwrap());
-
     let mut input_array = Array1::from_iter(data_sample.iter().cloned());
-    let array = input_array.view().insert_axis(Axis(0));
+    let input_array2 = input_array.view().insert_axis(Axis(0));
+
+    let sr: i64 = 8000;
+    let sr_array = Array1::from(vec![sr]);
+
+    let arr_1: Array1<f32> = array![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    let arr_1 = arr_1.insert_axis(ndarray::Axis(0));
+   //let cow_arr: CowArray<'_, f32, IxDyn> = CowArray::from(arr_1);
+
+    let arr_2 = array![arr_1.clone(), arr_1.clone()];
+
+    let h = arr_2.clone();
+    let c = arr_2.clone();
+
+    //let c_array = Array1::from(vec![c]);
+    
+
     let binding = session?;
     //not progressing past this line
-    let outputs = binding.run(inputs![array]?)?;
+    let outputs = binding.run(inputs![input_array2, sr_array, h, c]?)?;
 	let generated_tokens: Tensor<f32> = outputs["output1"].extract_tensor()?;
 	let generated_tokens = generated_tokens.view();
     println!("{}", generated_tokens.get(0).unwrap());

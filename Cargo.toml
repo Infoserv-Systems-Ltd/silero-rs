@@ -9,6 +9,8 @@ repository = "https://github.com/Infoserv-Systems-Ltd/sileror-rs"
 
 [dependencies]
 onnxruntime = "0.0.14"
+ort = "1.16.3"
+rand = "0.8.5"
 rodio = "0.17.3"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
