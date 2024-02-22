@@ -8,8 +8,10 @@ documentation = "https://docs.rs/sileror-rs"
 repository = "https://github.com/Infoserv-Systems-Ltd/sileror-rs"
 
 [dependencies]
-anyhow = { version = "1.0.79" }
+anyhow = "1.0.79"
 clap = { version = "4.4.18", features = ["derive"] }
+hound = "3.5.1"
+id3 = "1.12.0"
 ndarray = { version = "0.15" }
 # enable the line below when v2 of ORT is released
 # ort = {version = "2.0.0"}
@@ -21,6 +23,7 @@ ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = [
     "ndarray",
 #    "cuda"
 ] }
+plotters = "0.3.5"
 rand = { version = "0.8.5" }
 rodio = { version = "0.17.3" }
 tracing = { version = "0.1.40" }
