@@ -1,10 +1,25 @@
 [package]
 name = "silero-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-description = "Rust bindings for silero's C++ wrapper"
+description = "Rust API for Silero-VAD"
 license = "Unlicense"
 documentation = "https://docs.rs/sileror-rs"
 repository = "https://github.com/Infoserv-Systems-Ltd/sileror-rs"
 
 [dependencies]
+anyhow = "1.0.79"
+clap = { version = "4.4.18", features = ["derive"] }
+hound = "3.5.1"
+ndarray = { version = "0.15" }
+# enable the line below when v2 of ORT is released
+# ort = {version = "2.0.0"}
+# or
+# ort = {version = "2.0.0", features = [ "fetch-models" ] }
+# not sure if the ndarray is needed below.....
+ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = [
+    "fetch-models",
+    "ndarray",
+#    "cuda"
+] }
+
