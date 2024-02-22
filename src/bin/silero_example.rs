@@ -9,9 +9,6 @@ use clap::Parser;
 use ndarray::{arr1, arr2, arr3, Array2, Array3};
 use ndarray::{array, concatenate, s, Array1, Axis, CowArray, IxDyn, FixedInitializer};
 
-use rand::seq::index::sample;
-use rodio::{decoder::DecoderError, Decoder, Sample, Source};
-use id3::Tag;
 use hound::WavReader;
 
 use ort::inputs;
@@ -20,8 +17,6 @@ use ort::TensorElementDataType;
 use ort::Value;
 use ort::{CoreMLExecutionProvider, Session, Tensor};
 
-use rand::Rng;
-
 use std::array;
 use std::convert::TryInto;
 use std::error::Error as Err;
@@ -29,12 +24,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::any::type_name;
 use std::process::Output;
-
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
-
-use plotters::prelude::*;
-
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -64,30 +53,6 @@ fn main() -> Result<(), anyhow::Error>{
     Ok(())
 }
 
-fn get_audio_mp3(file_path: &str) -> Result<Vec<f32>, anyhow::Error> {
-
-    let aud_file = File::open(file_path)?;
-    let aud_decoder = Decoder::new(BufReader::new(aud_file))?;
-    let aud_array: Vec<i16> = aud_decoder.collect();
-    let aud_array: Vec<f32> = aud_array.iter().map(|&x| x as f32).collect();
-
-    /*match Tag::read_from_path(file_path) {
-        Ok(tag) => {
-            if let Some(sr) = tag.sample_rate() {
-                sample_rate = sr;
-            } else {
-                return Error(println!("File has no metadata"));
-            }
-        }
-        Err(err) => {
-            eprintln!("Error reading MP3 file metadata: {}", err);
-        }
-    }*/
-
-
-
-    Ok(aud_array)
-}
 
 fn get_audio_wav(file_path: &str) -> Result<AudioInfo, anyhow::Error> {
 
@@ -103,6 +68,7 @@ fn get_audio_wav(file_path: &str) -> Result<AudioInfo, anyhow::Error> {
 
     Ok(return_aud)
 }
+//works for 16kHz audio - outputs probability of audio in 1 second chunks
 fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
 
     let audio_data = get_audio_wav(audio_location).unwrap();
@@ -154,13 +120,12 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
     println!("{}", sr);
     let sr_array = Array1::from(vec![sr]);
     
-    let mut h = make_h_c_array();
-    let mut c = make_h_c_array();
+    let mut h = Array3::<f32>::zeros((2, 1, 64));
+    let mut c = Array3::<f32>::zeros((2, 1, 64));
     let dims = h.raw_dim();
     
     let mut outputs: Vec<Vec<f32>> = Vec::new();
     let session_binding = session?;
-    //let mut window_avg: Vec<f32> = Vec::new();
 
     for i in 0..audio_windows.len() {
 
@@ -198,61 +163,3 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
     Ok(())
     
 }
-
-fn make_h_c_array() -> Array3<f32> {
-
-    let a = Array3::<f32>::zeros((2, 1, 64));
-    return a;
-}
-
-/*fn create_graphs(input_audio: &Vec<f32>, output: &Vec<f32>) -> Result<(), anyhow::Error> {
-
-    let mut max: f32 = 0.0;
-    let mut graph_input_vec: Vec<f32> = Vec::new();
-    let mut graph_output_vec: Vec<f32> = Vec::new();
-
-    for i in input_audio {
-        if i > &max {
-            max = *i;
-        }
-    }
-
-    for i in 0..input_audio.len() {
-
-        let mut temp: f32 = *graph_input_vec.get(i).unwrap();
-        temp = temp/&max;
-        graph_input_vec.push(temp);
-    }
-
-    for i in output {
-        for j in 0..1536 {
-            graph_output_vec.push(i.clone());
-        }
-    }
-
-    if graph_input_vec.len() > graph_output_vec.len() {
-
-        graph_output_vec.truncate(graph_input_vec.len());
-    }
-
-    let root = BitMapBackend::new("waveform.png", (800, 600)).into_drawing_area();
-    root.fill(&WHITE)?;
-
-    let max_value = 1;
-    let min_value = 0;
-
-    let mut chart = ChartBuilder::on(&root)
-    .x_label_area_size(30)
-    .y_label_area_size(30)
-    .margin(5)
-    .caption("Waveform", ("Arial", 30).into_font())
-    .build_cartesian_2d(0..graph_input_vec.len() as i32, 0..1)?;
-
-    chart.draw_series(LineSeries::new(
-        (0..input_audio.len()).map(|i| (i as i32, samples[i])),
-        &RED,
-    ))?;
-
-
-    Ok(())
-}*/
