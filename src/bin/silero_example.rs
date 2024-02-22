@@ -95,6 +95,7 @@ fn get_audio_wav(file_path: &str) -> Result<AudioInfo, anyhow::Error> {
     let samp_rate: i64 = reader.spec().sample_rate as i64;
     let aud_array: Vec<i32> = reader.samples::<i32>().map(|x| x.unwrap()).collect::<Vec<_>>();
     let aud_array: Vec<f32> = aud_array.iter().map(|&x| x as f32).collect();
+    println!("{}", samp_rate);
     let return_aud: AudioInfo = AudioInfo {
         sample_rate: samp_rate,
         audio_array: aud_array,
@@ -106,8 +107,8 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
 
     let audio_data = get_audio_wav(audio_location).unwrap();
     let audio_vec = audio_data.audio_array;
-    let mut no_of_windows = (audio_vec.len() / 1536) as i16;
-    let len_final_window = (audio_vec.len() % 1536) as i16;
+    let mut no_of_windows = (audio_vec.len() / 16000) as i16;
+    let len_final_window = (audio_vec.len() % 16000) as i16;
     let mut audio_windows: Vec<Vec<f32>> = Vec::new();
     //could put this in a method?
     if no_of_windows == 0 {
@@ -119,7 +120,7 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
         let mut current_start: usize = 0;
         for i in 0..no_of_windows {
             let mut temp_vec: Vec<f32> = Vec::new();
-            let end_index: usize = current_start + 1536;
+            let end_index: usize = current_start + 16000;
             let window = &audio_vec[current_start..end_index];
             temp_vec.extend_from_slice(window);
             audio_windows.push(temp_vec);
@@ -159,6 +160,7 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
     
     let mut outputs: Vec<Vec<f32>> = Vec::new();
     let session_binding = session?;
+    //let mut window_avg: Vec<f32> = Vec::new();
 
     for i in 0..audio_windows.len() {
 
@@ -203,7 +205,7 @@ fn make_h_c_array() -> Array3<f32> {
     return a;
 }
 
-fn create_graphs(input_audio: &Vec<f32>, output: &Vec<f32>) -> Result<(), anyhow::Error> {
+/*fn create_graphs(input_audio: &Vec<f32>, output: &Vec<f32>) -> Result<(), anyhow::Error> {
 
     let mut max: f32 = 0.0;
     let mut graph_input_vec: Vec<f32> = Vec::new();
@@ -253,4 +255,4 @@ fn create_graphs(input_audio: &Vec<f32>, output: &Vec<f32>) -> Result<(), anyhow
 
 
     Ok(())
-}
+}*/
