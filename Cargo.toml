@@ -22,5 +22,4 @@ ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = [
     "ndarray",
 #    "cuda"
 ] }
-rand = "0.8.5"
 

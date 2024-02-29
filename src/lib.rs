@@ -1,8 +1,3 @@
-
-
-pub(crate) mod silero_vad_onnx_model;
-
-//take all this out now?
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
@@ -17,4 +12,3 @@ mod tests {
         assert_eq!(result, 4);
     }
 }
-

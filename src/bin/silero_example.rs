@@ -102,10 +102,10 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
         }
     }
 
-    /*ort::init()
+    ort::init()
         .with_name("Silero-VAD")
         .with_execution_providers([CoreMLExecutionProvider::default().build()])
-        .commit()?;*/
+        .commit()?;
 
     let mut session = Session::builder()?
         .with_optimization_level(GraphOptimizationLevel::Level1)?
@@ -118,9 +118,10 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
 
     let sr: i64 = audio_data.sample_rate;
     println!("{}", sr);
-    let sr_array: ndarray::prelude::ArrayBase<ndarray::OwnedRepr<i64>, ndarray::prelude::Dim<[usize; 1]>> = Array1::from(vec![sr]);
-    let mut h: ndarray::prelude::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>> = Array3::<f32>::zeros((2, 1, 64));
-    let mut c: ndarray::prelude::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>> = Array3::<f32>::zeros((2, 1, 64));
+    let sr_array = Array1::from(vec![sr]);
+    
+    let mut h = Array3::<f32>::zeros((2, 1, 64));
+    let mut c = Array3::<f32>::zeros((2, 1, 64));
     let dims = h.raw_dim();
     
     let mut outputs: Vec<Vec<f32>> = Vec::new();
@@ -157,16 +158,7 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
     }
     
     let outputs: Vec<f32> = outputs.into_iter().flat_map(|f| f ).collect();
-    let mut outputs2: Vec<bool> = Vec::new();
-    for x in &outputs {
-        if x > &0.5 {
-            outputs2.push(true);
-        } else {
-            outputs2.push(false);
-        }
-    }
     println!("{:?}", outputs);
-    println!("{:?}", outputs2);
 
     Ok(())
     
