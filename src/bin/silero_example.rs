@@ -102,11 +102,13 @@ fn run_model(model_location: &str, audio_location: &str) -> ort::Result<()> {
         }
     }
 
+    /*
+    commented out to test without environment builder
     ort::init()
         .with_name("Silero-VAD")
         .with_execution_providers([CoreMLExecutionProvider::default().build()])
         .commit()?;
-
+    */
     let mut session = Session::builder()?
         .with_optimization_level(GraphOptimizationLevel::Level1)?
         .with_intra_threads(1)?
