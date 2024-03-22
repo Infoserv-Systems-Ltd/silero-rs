@@ -1,8 +1,7 @@
 
 use ort::Session;
-
 use anyhow::Error;
-
+use std::path::Path;
 use crate::vad_session::VadSession;
 
 //anyway to get these things to not come up as unsued without doing allow deadcode at start of file?
@@ -16,24 +15,28 @@ pub struct VadEnvironment {
 
 impl VadEnvironment {
 
-    pub fn new(model_location: String) -> Result<Self, Error> {
+    pub fn new(model_location: String) -> Result<Self, anyhow::Error> {
 
         //discuss whether to change sample rate and vad threshold on a per environment or
         //per session basis, will add in the ability to select vad threshold and 
         //store sessions in vector and drop perodically?
-        let model_location = model_location;
-        let vad_sessions: Vec<Session> = Vec::new();
-        
-        Ok(Self {
+        if Path::new(&model_location).exists() {
+            let model_location = model_location;
+            let vad_sessions: Vec<Session> = Vec::new();
 
+            Ok(Self {
             model_location,
             vad_sessions
-        })
+            })
+
+        } else {
+            Err(Error::msg("Model can connot be found at the supplied path"))
+        }
     }
     
-    pub fn new_vad_session(&self) -> Result<VadSession, Error> {
+    pub fn new_vad_session(&self) -> Result<VadSession, anyhow::Error> {
 
-        let vad_session: Result<VadSession, Error> = VadSession::new(&self.model_location);
+        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location);
         return vad_session
         
     }
@@ -54,11 +57,11 @@ mod tests {
     }
 
     #[test]
-    fn test_struct () {
+    fn test_struct() {
 
-        let vad_environment = VadEnvironment::new(("/Users/oliver.pikett/Documents/GitHub/silero-rs/files/silero_vad.onnx").to_string()).unwrap();
+        let vad_environment = VadEnvironment::new(("files/silero_vad.onnx").to_string()).unwrap();
         let mut session = vad_environment.new_vad_session().unwrap();
-        let audio_data = get_audio_wav("/Users/oliver.pikett/Documents/GitHub/silero-rs/files/example.wav").unwrap();
+        let audio_data = get_audio_wav("files/example.wav").unwrap();
         let result = session.run_vad(audio_data).unwrap();
 
         let expected_outputs: [bool; 35] = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
@@ -66,6 +69,25 @@ mod tests {
 
         for i in 0..result.len() {
             assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap());
+        }
+
+    }
+
+    #[test]
+    fn test_model_path_check() {
+
+        let invalid_path = "not_a_path".to_string();
+        let environment_error = VadEnvironment::new(invalid_path);
+        match environment_error {
+            Ok(_) => {assert_eq!(true, false)}
+            Err(_) => {assert_eq!(true, true)}
+        }
+
+        let valid_path = "files/silero_vad.onnx".to_string();
+        let environment_ok = VadEnvironment::new(valid_path);
+        match environment_ok {
+            Ok(_) => {assert_eq!(true, true)}
+            Err(_) => {assert_eq!(true, false)}
         }
 
     }
