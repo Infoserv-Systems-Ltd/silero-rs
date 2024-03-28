@@ -3,3 +3,4 @@ files/alexnet_Opset18.onnx
 files/libonnxruntime.dylib
 files/libonnxruntime.1.17.0.dylib
 .DS_Store
+bin/demo.rs
