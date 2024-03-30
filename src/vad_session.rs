@@ -193,9 +193,47 @@ mod tests {
         ];
 
         for i in 0..result.len() {
-            assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
+            assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad_wav is not outputting the expected values");
         }
     }
+
+    #[test]
+    fn test_run_vad_wav () {
+        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 16000).unwrap();
+        let result = silero_model.run_vad_wav("files/example.wav");
+        match result {
+            Ok(result) => {
+
+                let expected_outputs: [bool; 35] = [
+                    true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+                    true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+                    true, true, true, true, true, true, true,
+                ];
+
+                for i in 0..result.len() {
+                    assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
+                }
+
+            }
+
+            Err(_) => {
+                assert_eq!(true, false, "run_vad_wav not working");
+            }
+        }
+
+        let result2 = silero_model.run_vad_wav("files/10-seconds.mp3");
+        match result2 {
+            Ok(_) => {
+                assert_eq!(true, false, "method should not have returned ok");
+            }
+
+            Err(_) => {
+                assert_eq!(true, true);
+            }
+        }
+
+    }
+
 }
 
 
