@@ -8,23 +8,39 @@ use std::fs::File;
 use std::io::Read;
 use hound::WavReader;
 
+pub enum ReturnType {
+    Booleans(Vec<bool>),
+    Floats(Vec<f32>),
+}
 
+impl ReturnType {
+    pub fn unwrap_float(self) -> Result<Vec<f32>, anyhow::Error> {
+        match self {
+            ReturnType::Floats(float_vec) => return Ok(float_vec),
+            ReturnType::Booleans(_) => return Err(Error::msg("Please use unwrap_boolean"))
+        }
+    }
+
+    pub fn unwrap_boolean(self) -> Result<Vec<bool>, anyhow::Error> {
+        match self {
+            ReturnType::Booleans(bool_vec) => return Ok(bool_vec),
+            ReturnType::Floats(_) => return Err(Error::msg("Please use unwrap_float"))
+        }
+    }
+}
 pub struct VadSession {
-    pub sample_rate: i64,
     h: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     c: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     vad_threshold: f32,
+    return_probs: bool,
     session: ort::Session,
 }
 
 impl VadSession {
-    pub fn new(model_location: &PathBuf, sample_rate: i64) -> Result<Self, anyhow::Error> {
+    pub fn new(model_location: &PathBuf, vad_threshold: f32, return_probs: bool) -> Result<Self, anyhow::Error> {
         //concerned with this due to lack of execution provider and environment which I used in silero_example however in ort documentation it says
         //that when an environment is not used one is made by default. It appears to be working on my end interested to know what happens on your end.
         //will what I have done here work for multiple streams I think there may be issues? Could make another object containing an ort environment that creates SileroVadOnnxModel instances
-        if !((sample_rate == 8000) || (sample_rate == 16000)) {
-            return Err(Error::msg("Sample rate must be 8000 or 16000"))
-        }
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level1)?
             .with_intra_threads(1)?
@@ -34,22 +50,25 @@ impl VadSession {
             //assumes sample rate of data given is 16kHz could assign this later on to give flexability
             //same with vad_threshold
             //does the model location need to be saved?
-            sample_rate: sample_rate,
             //do i need h and c here if each clip is independant? If this is the case the h/c need only exist in run_vad scope
             h: Array3::<f32>::zeros((2, 1, 64)),
             c: Array3::<f32>::zeros((2, 1, 64)),
-            vad_threshold: 0.5,
+            vad_threshold,
+            return_probs,
             session,
         })
     }
 
     //will return true/false for 1sec chunks, final chunk could be too small to be worthwhile
-    pub fn run_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<bool>, anyhow::Error> {
+    pub fn run_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<ReturnType, anyhow::Error> {
         //put in check to validate input here?
+        if !((sample_rate == 8000) || (sample_rate == 16000)) {
+            return Err(Error::msg("Sample rate must be 8000 or 16000"))
+        }
         self.reset();
         let audio_chunks: Vec<Vec<f32>> = prepare_data(audio_data);
         let h_c_dims = self.h.raw_dim();
-        let mut audio_chunks_result: Vec<bool> = Vec::new();
+        let mut audio_chunks_result: Vec<f32> = Vec::new();
         let sample_rate = Array1::from(vec![sample_rate]);
 
         for chunk in audio_chunks {
@@ -73,18 +92,26 @@ impl VadSession {
 
             self.h = Array3::from_shape_vec((h_c_dims[0], h_c_dims[1], h_c_dims[2]), hn).unwrap();
             self.c = Array3::from_shape_vec((h_c_dims[0], h_c_dims[1], h_c_dims[2]), cn).unwrap();
-
-            if chunk_output.get(0).unwrap() < &self.vad_threshold {
-                audio_chunks_result.push(false);
-            } else {
-                audio_chunks_result.push(true);
-            }
+            
+            audio_chunks_result.push(chunk_output.get(0).unwrap().clone());
+            
         }
 
-        Ok(audio_chunks_result)
+        if self.return_probs == false {
+            let mut audio_chunks_bool: Vec<bool> = Vec::new();
+            for item in audio_chunks_result {
+                if item < self.vad_threshold {
+                    audio_chunks_bool.push(false);
+                } else {
+                    audio_chunks_bool.push(true);
+                }
+            }
+            return Ok(ReturnType::Booleans(audio_chunks_bool))
+        }
+        return Ok(ReturnType::Floats(audio_chunks_result))
     }
 
-    fn run_vad_wav(&mut self, file_path: &str) -> Result<Vec<bool>, anyhow::Error> {
+    pub fn run_vad_wav(&mut self, file_path: &str) -> Result<ReturnType, anyhow::Error> {
 
         let path = Path::new(&file_path);
         if !path.exists() {
@@ -106,7 +133,6 @@ impl VadSession {
             return Err(Error::msg("The sample rate of this audio file is not compatible with Silero, it must be 8000 or 16000 kHz"))
         }
         return self.run_vad(aud_array, sample_rate)
-
     }
 
     pub fn reset(&mut self) {
@@ -181,8 +207,8 @@ mod tests {
     fn test_struct() {
         let audio_data = get_audio_wav("files/example.wav").unwrap();
         let audio_data2 = audio_data.clone();
-        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 16000).unwrap();
-        let result = silero_model.run_vad(audio_data, silero_model.sample_rate.clone()).unwrap();
+        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5, false).unwrap();
+        let result = silero_model.run_vad(audio_data, 16000).unwrap().unwrap_boolean().unwrap();
         let result2 = prepare_data(audio_data2);
         assert_eq!(result.len(), result2.len());
 
@@ -199,19 +225,19 @@ mod tests {
 
     #[test]
     fn test_run_vad_wav () {
-        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 16000).unwrap();
+        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5, false).unwrap();
         let result = silero_model.run_vad_wav("files/example.wav");
         match result {
             Ok(result) => {
-
+                let result2 = result.unwrap_boolean().unwrap();
                 let expected_outputs: [bool; 35] = [
                     true, true, true, true, true, true, true, true, true, true, true, true, true, true,
                     true, true, true, true, true, true, true, true, true, true, true, true, true, true,
                     true, true, true, true, true, true, true,
                 ];
 
-                for i in 0..result.len() {
-                    assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
+                for i in 0..result2.len() {
+                    assert_eq!(result2.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
                 }
 
             }
@@ -221,8 +247,8 @@ mod tests {
             }
         }
 
-        let result2 = silero_model.run_vad_wav("files/10-seconds.mp3");
-        match result2 {
+        let result3 = silero_model.run_vad_wav("files/10-seconds.mp3");
+        match result3 {
             Ok(_) => {
                 assert_eq!(true, false, "method should not have returned ok");
             }

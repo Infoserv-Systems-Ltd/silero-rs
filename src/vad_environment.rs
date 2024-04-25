@@ -6,12 +6,13 @@ use std::path::{Path, PathBuf};
 //anyway to get these things to not come up as unsued without doing allow deadcode at start of file?
 pub struct VadEnvironment {
     model_location: PathBuf,
-    //keep vad_sessions in vector?
+    return_probs: bool,
+    vad_threshold: f32,
     vad_sessions: Vec<Session>,
 }
 
 impl VadEnvironment{
-    pub fn new(model_location: &str) -> Result<Self, anyhow::Error> {
+    pub fn new(model_location: &str, return_probs: bool, vad_threshold: f32) -> Result<Self, anyhow::Error> {
         //discuss whether to change sample rate and vad threshold on a per environment or
         //per session basis, will add in the ability to select vad threshold and
         //store sessions in vector and drop perodically?
@@ -22,6 +23,8 @@ impl VadEnvironment{
 
             Ok(Self {
                 model_location,
+                return_probs,
+                vad_threshold,
                 vad_sessions,
             })
         } else {
@@ -29,8 +32,8 @@ impl VadEnvironment{
         }
     }
 
-    pub fn new_vad_session(&self, sample_rate: i64) -> Result<VadSession, anyhow::Error> {
-        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, sample_rate);
+    pub fn new_vad_session(&self) -> Result<VadSession, anyhow::Error> {
+        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, self.vad_threshold, self.return_probs);
         return vad_session;
     }
 }
@@ -53,10 +56,10 @@ mod tests {
 
     #[test]
     fn test_struct() {
-        let vad_environment = VadEnvironment::new("files/silero_vad.onnx").unwrap();
-        let mut session = vad_environment.new_vad_session(16000).unwrap();
+        let vad_environment = VadEnvironment::new("files/silero_vad.onnx", false, 0.5).unwrap();
+        let mut session = vad_environment.new_vad_session().unwrap();
         let audio_data = get_audio_wav("files/example.wav").unwrap();
-        let result = session.run_vad(audio_data, session.sample_rate).unwrap();
+        let result = session.run_vad(audio_data, 16000).unwrap().unwrap_boolean().unwrap();
 
         let expected_outputs: [bool; 35] = [
             true, true, true, true, true, true, true, true, true, true, true, true, true, true,
@@ -74,7 +77,7 @@ mod tests {
 
         let path = Path::new("files/silero_vad.onnx");
         assert_eq!(true, path.exists(), "Path not valid");
-        let environment_error = VadEnvironment::new("not a path");
+        let environment_error = VadEnvironment::new("not a path", false, 0.5);
         match environment_error {
             Ok(_) => {
                 assert_eq!(true, false)
@@ -84,7 +87,7 @@ mod tests {
             }
         }
 
-        let environment_ok = VadEnvironment::new("files/silero_vad.onnx");
+        let environment_ok = VadEnvironment::new("files/silero_vad.onnx", false, 0.5);
         match environment_ok {
             Ok(_) => {
                 assert_eq!(true, true)
