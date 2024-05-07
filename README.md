@@ -3,11 +3,13 @@
 ## Build
 
 To build this library onnxruntime binaries are needed, they can be found here under assets: https://github.com/microsoft/onnxruntime/releases
-```
-Choose the library for your OS and architecture but not the libraries that have training in the name. Extract the binaries, they can be found in the lib folder.
-```
-When building run these commands on one terminal line: ORT_STRATEGY=system ORT_LIB_LOCATION='location of binaries' cargo build 
 
+Choose the library for your OS and architecture but not the libraries that have training in the name. Extract the binaries, they can be found in the lib folder.
+
+When building run these commands on one terminal line: 
+```
+ORT_STRATEGY=system ORT_LIB_LOCATION='location of binaries' cargo build 
+```
 ## Silero Example
 
 Run with
