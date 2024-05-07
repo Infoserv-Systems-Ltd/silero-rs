@@ -18,13 +18,19 @@ pub struct VadSession {
 }
 
 impl VadSession {
-    pub fn new(model_location: &PathBuf, sample_rate: i64) -> Result<Self, anyhow::Error> {
+   pub fn new(model_location: &PathBuf, sample_rate: i64) -> Result<Self, anyhow::Error> {
         //concerned with this due to lack of execution provider and environment which I used in silero_example however in ort documentation it says
         //that when an environment is not used one is made by default. It appears to be working on my end interested to know what happens on your end.
         //will what I have done here work for multiple streams I think there may be issues? Could make another object containing an ort environment that creates SileroVadOnnxModel instances
         if !((sample_rate == 8000) || (sample_rate == 16000)) {
             return Err(Error::msg("Sample rate must be 8000 or 16000"))
         }
+
+        /*ort::init()
+		    .with_name("Silero-VAD")
+		    .with_execution_providers([CoreMLExecutionProvider::default().build()])
+		    .commit()?;*/
+
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level1)?
             .with_intra_threads(1)?
