@@ -24,7 +24,9 @@ jobs:
       - name: linux_version
         run: lsb_release -a
       - name: Build
-        run: ORT_STRATEGY=system ORT_LIB_LOCATION=.github/workflows cargo build --verbose 
+        run:
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows
+          ORT_STRATEGY=system ORT_LIB_LOCATION=.github/workflows cargo build
       - name: Run tests
         run: 
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows
