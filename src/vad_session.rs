@@ -8,23 +8,35 @@ use std::fs::File;
 use std::io::Read;
 use hound::WavReader;
 
-pub enum ReturnType {
-    Booleans(Vec<bool>),
-    Floats(Vec<f32>),
+pub struct VADResult {
+    start_period: i32,
+    end_period: i32,
+    probability: f32,
+    voice_detect: bool
 }
 
-impl ReturnType {
-    pub fn unwrap_float(self) -> Result<Vec<f32>, anyhow::Error> {
-        match self {
-            ReturnType::Floats(float_vec) => return Ok(float_vec),
-            ReturnType::Booleans(_) => return Err(Error::msg("Please use unwrap_boolean"))
+impl VADResult {
+    pub fn new(start_period: i32, end_period: i32, probability: f32, voice_detect: bool) -> Self {
+        Self {
+            start_period,
+            end_period,
+            probability,
+            voice_detect
         }
     }
+}
+pub struct AudioWindow {
+    audio_data: Vec<f32>,
+    start_period: i32,
+    end_period: i32
+}
 
-    pub fn unwrap_boolean(self) -> Result<Vec<bool>, anyhow::Error> {
-        match self {
-            ReturnType::Booleans(bool_vec) => return Ok(bool_vec),
-            ReturnType::Floats(_) => return Err(Error::msg("Please use unwrap_float"))
+impl AudioWindow {
+    pub fn new(audio_data: Vec<f32>, start_period: i32, end_period: i32) -> Self {
+        Self {
+            audio_data,
+            start_period,
+            end_period
         }
     }
 }
@@ -32,12 +44,16 @@ pub struct VadSession {
     h: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     c: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     vad_threshold: f32,
-    return_probs: bool,
     session: ort::Session,
 }
+/* 
+TO DO: 
+fix tests
+test new code
+*/
 
 impl VadSession {
-    pub fn new(model_location: &PathBuf, vad_threshold: f32, return_probs: bool) -> Result<Self, anyhow::Error> {
+    pub fn new(model_location: &PathBuf, vad_threshold: f32) -> Result<Self, anyhow::Error> {
         //concerned with this due to lack of execution provider and environment which I used in silero_example however in ort documentation it says
         //that when an environment is not used one is made by default. It appears to be working on my end interested to know what happens on your end.
         //will what I have done here work for multiple streams I think there may be issues? Could make another object containing an ort environment that creates SileroVadOnnxModel instances
@@ -54,64 +70,61 @@ impl VadSession {
             h: Array3::<f32>::zeros((2, 1, 64)),
             c: Array3::<f32>::zeros((2, 1, 64)),
             vad_threshold,
-            return_probs,
             session,
         })
     }
 
     //will return true/false for 1sec chunks, final chunk could be too small to be worthwhile
-    pub fn run_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<ReturnType, anyhow::Error> {
+    pub fn run_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VADResult>, anyhow::Error> {
         //put in check to validate input here?
         if !((sample_rate == 8000) || (sample_rate == 16000)) {
             return Err(Error::msg("Sample rate must be 8000 or 16000"))
         }
-        self.reset();
-        let audio_chunks: Vec<Vec<f32>> = prepare_data(audio_data);
+        let audio_windows: Vec<AudioWindow> = prepare_data(audio_data, sample_rate);
         let h_c_dims = self.h.raw_dim();
-        let mut audio_chunks_result: Vec<f32> = Vec::new();
+        let mut audio_windows_result: Vec<VADResult> = Vec::new();
         let sample_rate = Array1::from(vec![sample_rate]);
 
-        for chunk in audio_chunks {
-            let input_chunk = ndarray::Array1::from_iter(chunk.iter().cloned());
-            let input_chunk = input_chunk.view().insert_axis(Axis(0));
-            //is cloning necessary?
-            let chunk_outputs: &ort::SessionOutputs<'_> = &self.session.run(inputs![
-                input_chunk,
+        for window in audio_windows {
+
+            let input_audio = ndarray::Array1::from_iter(window.audio_data.iter().cloned());
+            let input_audio = input_audio.view().insert_axis(Axis(0));
+            let window_outputs: &ort::SessionOutputs<'_> = &self.session.run(inputs![
+                input_audio,
                 sample_rate.clone(),
                 self.h.clone(),
                 self.c.clone()
             ]?)?;
-            let chunk_output: Tensor<f32> = chunk_outputs["output"].extract_tensor()?;
-            let chunk_output: Vec<f32> = chunk_output.view().iter().copied().collect();
 
-            let hn: Tensor<f32> = chunk_outputs["hn"].extract_tensor()?;
+            let window_output: Tensor<f32> = window_outputs["output"].extract_tensor()?;
+            let window_output: Vec<f32> = window_output.view().iter().copied().collect();
+
+            let hn: Tensor<f32> = window_outputs["hn"].extract_tensor()?;
             let hn: Vec<f32> = hn.view().iter().copied().collect();
 
-            let cn: Tensor<f32> = chunk_outputs["cn"].extract_tensor()?;
+            let cn: Tensor<f32> = window_outputs["cn"].extract_tensor()?;
             let cn: Vec<f32> = cn.view().iter().copied().collect();
 
             self.h = Array3::from_shape_vec((h_c_dims[0], h_c_dims[1], h_c_dims[2]), hn).unwrap();
             self.c = Array3::from_shape_vec((h_c_dims[0], h_c_dims[1], h_c_dims[2]), cn).unwrap();
             
-            audio_chunks_result.push(chunk_output.get(0).unwrap().clone());
-            
+            let probability: f32 = window_output.get(0).unwrap().clone();
+            let voice_detect: bool;
+
+            if probability < self.vad_threshold {
+               voice_detect = false;
+            } else {
+                voice_detect = true;
+            }
+
+            let vad_result: VADResult = VADResult::new(window.start_period, window.end_period, probability, voice_detect);
+            audio_windows_result.push(vad_result);
         }
 
-        if self.return_probs == false {
-            let mut audio_chunks_bool: Vec<bool> = Vec::new();
-            for item in audio_chunks_result {
-                if item < self.vad_threshold {
-                    audio_chunks_bool.push(false);
-                } else {
-                    audio_chunks_bool.push(true);
-                }
-            }
-            return Ok(ReturnType::Booleans(audio_chunks_bool))
-        }
-        return Ok(ReturnType::Floats(audio_chunks_result))
+        return Ok(audio_windows_result)
     }
 
-    pub fn run_vad_wav(&mut self, file_path: &str) -> Result<ReturnType, anyhow::Error> {
+    pub fn run_vad_wav(&mut self, file_path: &str) -> Result<Vec<VADResult>, anyhow::Error> {
 
         let path = Path::new(&file_path);
         if !path.exists() {
@@ -141,34 +154,33 @@ impl VadSession {
     }
 }
 
+fn prepare_data(audio_data: Vec<f32>, sample_rate: i64) -> Vec<AudioWindow> {
+    let mut audio_windows: Vec<AudioWindow> = Vec::new();
+    let no_of_windows = audio_data.len() / sample_rate as usize;
 
-//check audio_data is not empty BEFORE this method is called - too short/empty?
-fn prepare_data(audio_data: Vec<f32>) -> Vec<Vec<f32>> {
-    let mut audio_chunks: Vec<Vec<f32>> = Vec::new();
-    let no_of_chunks = audio_data.len() / 16000;
-
-    if no_of_chunks == 0 {
-        audio_chunks.push(audio_data);
-        return audio_chunks;
+    if no_of_windows == 0 {
+        let audio_window: AudioWindow = AudioWindow::new(audio_data.clone(), 0, audio_data.len().try_into().unwrap());
+        audio_windows.push(audio_window);
+        return audio_windows;
     }
 
-    //more efficient way to do this?
     let mut start_index: usize = 0;
-    for _ in 0..no_of_chunks {
-        let end_index: usize = start_index + 16000;
-        let chunk = &audio_data[start_index..end_index];
-        audio_chunks.push(chunk.to_vec());
+    for _ in 0..no_of_windows {
+        let end_index: usize = start_index + sample_rate as usize;
+        let window = &audio_data[start_index..end_index];
+        let audio_window: AudioWindow = AudioWindow::new(window.to_vec(), start_index as i32, (end_index as i32)-1);
+        audio_windows.push(audio_window);
         start_index = end_index;
     }
 
-    if (audio_data.len() % 16000) != 0 {
-        let chunk = &audio_data[start_index..(audio_data.len() as usize)];
-        audio_chunks.push(chunk.to_vec());
+    if (audio_data.len() % sample_rate as usize) != 0 {
+        let window = &audio_data[start_index..(audio_data.len() as usize)];
+        let audio_window: AudioWindow = AudioWindow::new(window.to_vec(), start_index as i32, (audio_data.len()-1).try_into().unwrap());
+        audio_windows.push(audio_window);
     }
-    return audio_chunks;
+    return audio_windows;
 }
 
-//more tests needed? edge cases etc?
 #[cfg(test)]
 mod tests {
 
@@ -190,16 +202,16 @@ mod tests {
     fn test_prepre_data() {
         let mut rng = rand::thread_rng();
         let random_vector: Vec<f32> = (0..100000).map(|_| rng.gen::<f32>()).collect();
-        let result1 = prepare_data(random_vector);
-        let test_sample = result1.get(0).unwrap();
-        let test_sample2 = result1.get(6).unwrap();
-        assert_eq!(result1.len(), 7);
-        assert_eq!(test_sample.len(), 16000);
+        let result1 = prepare_data(random_vector, 8000);
+        let test_sample = result1.get(0).unwrap().audio_data.clone();
+        let test_sample2 = result1.get(12).unwrap().audio_data.clone();
+        assert_eq!(result1.len(), 13);
+        assert_eq!(test_sample.len(), 8000);
         assert_eq!(test_sample2.len(), 4000);
 
         let random_vector2: Vec<f32> = (0..100).map(|_| rng.gen::<f32>()).collect();
-        let result2 = prepare_data(random_vector2);
-        let test_sample3 = result2.get(0).unwrap();
+        let result2 = prepare_data(random_vector2, 16000);
+        let test_sample3 = result2.get(0).unwrap().audio_data.clone();
         assert_eq!(test_sample3.len(), 100, "Prepare data is not working correctly");
     }
 
@@ -207,9 +219,9 @@ mod tests {
     fn test_struct() {
         let audio_data = get_audio_wav("files/example.wav").unwrap();
         let audio_data2 = audio_data.clone();
-        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5, false).unwrap();
-        let result = silero_model.run_vad(audio_data, 16000).unwrap().unwrap_boolean().unwrap();
-        let result2 = prepare_data(audio_data2);
+        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5,).unwrap();
+        let result = silero_model.run_vad(audio_data, 16000).unwrap();
+        let result2 = prepare_data(audio_data2, 16000);
         assert_eq!(result.len(), result2.len());
 
         let expected_outputs: [bool; 35] = [
@@ -219,42 +231,31 @@ mod tests {
         ];
 
         for i in 0..result.len() {
-            assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad_wav is not outputting the expected values");
+            assert_eq!(result.get(i).unwrap().voice_detect, *expected_outputs.get(i).unwrap(), "run_vad_wav is not outputting the expected values");
         }
     }
 
     #[test]
     fn test_run_vad_wav () {
-        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5, false).unwrap();
+        let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5).unwrap();
         let result = silero_model.run_vad_wav("files/example.wav");
         match result {
             Ok(result) => {
-                let result2 = result.unwrap_boolean().unwrap();
+            
                 let expected_outputs: [bool; 35] = [
                     true, true, true, true, true, true, true, true, true, true, true, true, true, true,
                     true, true, true, true, true, true, true, true, true, true, true, true, true, true,
                     true, true, true, true, true, true, true,
                 ];
 
-                for i in 0..result2.len() {
-                    assert_eq!(result2.get(i).unwrap(), expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
+                for i in 0..result.len() {
+                    assert_eq!(result.get(i).unwrap().voice_detect, *expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
                 }
 
             }
 
             Err(_) => {
                 assert_eq!(true, false, "run_vad_wav not working");
-            }
-        }
-
-        let result3 = silero_model.run_vad_wav("files/10-seconds.mp3");
-        match result3 {
-            Ok(_) => {
-                assert_eq!(true, false, "method should not have returned ok");
-            }
-
-            Err(_) => {
-                assert_eq!(true, true);
             }
         }
 

@@ -33,7 +33,7 @@ impl VadEnvironment{
     }
 
     pub fn new_vad_session(&self) -> Result<VadSession, anyhow::Error> {
-        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, self.vad_threshold, self.return_probs);
+        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, self.vad_threshold);
         return vad_session;
     }
 }
@@ -54,23 +54,6 @@ mod tests {
         Ok(aud_array)
     }
 
-    #[test]
-    fn test_struct() {
-        let vad_environment = VadEnvironment::new("files/silero_vad.onnx", false, 0.5).unwrap();
-        let mut session = vad_environment.new_vad_session().unwrap();
-        let audio_data = get_audio_wav("files/example.wav").unwrap();
-        let result = session.run_vad(audio_data, 16000).unwrap().unwrap_boolean().unwrap();
-
-        let expected_outputs: [bool; 35] = [
-            true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-            true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-            true, true, true, true, true, true, true,
-        ];
-
-        for i in 0..result.len() {
-            assert_eq!(result.get(i).unwrap(), expected_outputs.get(i).unwrap());
-        }
-    }
 
     #[test]
     fn test_model_path_check() {

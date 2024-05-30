@@ -1,5 +1,4 @@
 **/target
-files/alexnet_Opset18.onnx
 files/libonnxruntime.dylib
-files/libonnxruntime.1.17.0.dylib
+files/libonnxruntime.1.16.3.dylib
 .DS_Store
