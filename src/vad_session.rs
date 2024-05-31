@@ -46,17 +46,11 @@ pub struct VadSession {
     vad_threshold: f32,
     session: ort::Session,
 }
-/* 
-TO DO: 
-fix tests
-test new code
-*/
 
 impl VadSession {
+
     pub fn new(model_location: &PathBuf, vad_threshold: f32) -> Result<Self, anyhow::Error> {
-        //concerned with this due to lack of execution provider and environment which I used in silero_example however in ort documentation it says
-        //that when an environment is not used one is made by default. It appears to be working on my end interested to know what happens on your end.
-        //will what I have done here work for multiple streams I think there may be issues? Could make another object containing an ort environment that creates SileroVadOnnxModel instances
+
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level1)?
             .with_intra_threads(1)?
