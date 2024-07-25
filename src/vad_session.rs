@@ -45,6 +45,7 @@ pub struct VadSession {
     c: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     detection_threshold: f32,
     session: ort::Session,
+    time_elapsed: f32
 }
 
 impl VadSession {
@@ -61,6 +62,7 @@ impl VadSession {
             c: Array3::<f32>::zeros((2, 1, 64)),
             detection_threshold,
             session,
+            time_elapsed: 0
         })
     }
 
@@ -139,6 +141,7 @@ impl VadSession {
     pub fn reset(&mut self) {
         self.h = Array3::<f32>::zeros((2, 1, 64));
         self.c = Array3::<f32>::zeros((2, 1, 64));
+        self.time_elapsed = 0;
     }
 
 }
