@@ -1,4 +1,3 @@
 **/target
 files/libonnxruntime*
 .DS_Store
-bin/demo.rs
