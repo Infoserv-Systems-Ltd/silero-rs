@@ -3,19 +3,13 @@ use anyhow::Error;
 use ort::Session;
 use std::path::{Path, PathBuf};
 
-//anyway to get these things to not come up as unsued without doing allow deadcode at start of file?
 pub struct VadEnvironment {
     model_location: PathBuf,
-    return_probs: bool,
-    vad_threshold: f32,
     vad_sessions: Vec<Session>,
 }
 
 impl VadEnvironment{
-    pub fn new(model_location: &str, return_probs: bool, vad_threshold: f32) -> Result<Self, anyhow::Error> {
-        //discuss whether to change sample rate and vad threshold on a per environment or
-        //per session basis, will add in the ability to select vad threshold and
-        //store sessions in vector and drop perodically?
+    pub fn new(model_location: &str) -> Result<Self, anyhow::Error> {
         let path = Path::new(&model_location);
         if path.exists() {
             let model_location = PathBuf::from(model_location);
@@ -23,8 +17,6 @@ impl VadEnvironment{
 
             Ok(Self {
                 model_location,
-                return_probs,
-                vad_threshold,
                 vad_sessions,
             })
         } else {
@@ -32,8 +24,8 @@ impl VadEnvironment{
         }
     }
 
-    pub fn new_vad_session(&self) -> Result<VadSession, anyhow::Error> {
-        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, self.vad_threshold);
+    pub fn new_vad_session(&self, vad_threshold: f32) -> Result<VadSession, anyhow::Error> {
+        let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, vad_threshold);
         return vad_session;
     }
 }
@@ -60,7 +52,7 @@ mod tests {
 
         let path = Path::new("files/silero_vad.onnx");
         assert_eq!(true, path.exists(), "Path not valid");
-        let environment_error = VadEnvironment::new("not a path", false, 0.5);
+        let environment_error = VadEnvironment::new("not a path");
         match environment_error {
             Ok(_) => {
                 assert_eq!(true, false)
@@ -70,7 +62,7 @@ mod tests {
             }
         }
 
-        let environment_ok = VadEnvironment::new("files/silero_vad.onnx", false, 0.5);
+        let environment_ok = VadEnvironment::new("files/silero_vad.onnx");
         match environment_ok {
             Ok(_) => {
                 assert_eq!(true, true)

@@ -8,14 +8,14 @@ use std::fs::File;
 use std::io::Read;
 use hound::WavReader;
 
-pub struct VADResult {
+pub struct VoiceDetectResult {
     start_period: i32,
     end_period: i32,
     probability: f32,
     voice_detect: bool
 }
 
-impl VADResult {
+impl VoiceDetectResult{
     pub fn new(start_period: i32, end_period: i32, probability: f32, voice_detect: bool) -> Self {
         Self {
             start_period,
@@ -25,13 +25,13 @@ impl VADResult {
         }
     }
 }
-pub struct AudioWindow {
+pub struct AudioDetectWindow {
     audio_data: Vec<f32>,
     start_period: i32,
     end_period: i32
 }
 
-impl AudioWindow {
+impl AudioDetectWindow {
     pub fn new(audio_data: Vec<f32>, start_period: i32, end_period: i32) -> Self {
         Self {
             audio_data,
@@ -43,13 +43,13 @@ impl AudioWindow {
 pub struct VadSession {
     h: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     c: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
-    vad_threshold: f32,
+    detection_threshold: f32,
     session: ort::Session,
 }
 
 impl VadSession {
 
-    pub fn new(model_location: &PathBuf, vad_threshold: f32) -> Result<Self, anyhow::Error> {
+    pub fn new(model_location: &PathBuf, detection_threshold: f32) -> Result<Self, anyhow::Error> {
 
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level1)?
@@ -57,26 +57,20 @@ impl VadSession {
             .with_model_from_file(&model_location)?;
 
         Ok(Self {
-            //assumes sample rate of data given is 16kHz could assign this later on to give flexability
-            //same with vad_threshold
-            //does the model location need to be saved?
-            //do i need h and c here if each clip is independant? If this is the case the h/c need only exist in run_vad scope
             h: Array3::<f32>::zeros((2, 1, 64)),
             c: Array3::<f32>::zeros((2, 1, 64)),
-            vad_threshold,
+            detection_threshold,
             session,
         })
     }
 
-    //will return true/false for 1sec chunks, final chunk could be too small to be worthwhile
-    pub fn run_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VADResult>, anyhow::Error> {
-        //put in check to validate input here?
+    pub fn run_voice_detection(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VoiceDetectResult>, anyhow::Error> {
         if !((sample_rate == 8000) || (sample_rate == 16000)) {
             return Err(Error::msg("Sample rate must be 8000 or 16000"))
         }
-        let audio_windows: Vec<AudioWindow> = prepare_data(audio_data, sample_rate);
+        let audio_windows: Vec<AudioDetectWindow> = prepare_audio_data(audio_data, sample_rate);
         let h_c_dims = self.h.raw_dim();
-        let mut audio_windows_result: Vec<VADResult> = Vec::new();
+        let mut audio_windows_result: Vec<VoiceDetectResult> = Vec::new();
         let sample_rate = Array1::from(vec![sample_rate]);
 
         for window in audio_windows {
@@ -105,20 +99,20 @@ impl VadSession {
             let probability: f32 = window_output.get(0).unwrap().clone();
             let voice_detect: bool;
 
-            if probability < self.vad_threshold {
+            if probability < self.detection_threshold {
                voice_detect = false;
             } else {
                 voice_detect = true;
             }
 
-            let vad_result: VADResult = VADResult::new(window.start_period, window.end_period, probability, voice_detect);
+            let vad_result: VoiceDetectResult = VoiceDetectResult::new(window.start_period, window.end_period, probability, voice_detect);
             audio_windows_result.push(vad_result);
         }
 
         return Ok(audio_windows_result)
     }
 
-    pub fn run_vad_wav(&mut self, file_path: &str) -> Result<Vec<VADResult>, anyhow::Error> {
+    pub fn run_voice_detection_wav(&mut self, file_path: &str) -> Result<Vec<VoiceDetectResult>, anyhow::Error> {
 
         let path = Path::new(&file_path);
         if !path.exists() {
@@ -139,21 +133,22 @@ impl VadSession {
         if !(sample_rate == 8000 || sample_rate == 16000) {
             return Err(Error::msg("The sample rate of this audio file is not compatible with Silero, it must be 8000 or 16000 kHz"))
         }
-        return self.run_vad(aud_array, sample_rate)
+        return self.run_voice_detection(aud_array, sample_rate)
     }
 
     pub fn reset(&mut self) {
         self.h = Array3::<f32>::zeros((2, 1, 64));
         self.c = Array3::<f32>::zeros((2, 1, 64));
     }
+
 }
 
-fn prepare_data(audio_data: Vec<f32>, sample_rate: i64) -> Vec<AudioWindow> {
-    let mut audio_windows: Vec<AudioWindow> = Vec::new();
+fn prepare_audio_data(audio_data: Vec<f32>, sample_rate: i64) -> Vec<AudioDetectWindow> {
+    let mut audio_windows: Vec<AudioDetectWindow> = Vec::new();
     let no_of_windows = audio_data.len() / sample_rate as usize;
 
     if no_of_windows == 0 {
-        let audio_window: AudioWindow = AudioWindow::new(audio_data.clone(), 0, audio_data.len().try_into().unwrap());
+        let audio_window: AudioDetectWindow = AudioDetectWindow::new(audio_data.clone(), 0, audio_data.len().try_into().unwrap());
         audio_windows.push(audio_window);
         return audio_windows;
     }
@@ -162,18 +157,20 @@ fn prepare_data(audio_data: Vec<f32>, sample_rate: i64) -> Vec<AudioWindow> {
     for _ in 0..no_of_windows {
         let end_index: usize = start_index + sample_rate as usize;
         let window = &audio_data[start_index..end_index];
-        let audio_window: AudioWindow = AudioWindow::new(window.to_vec(), start_index as i32, (end_index as i32)-1);
+        let audio_window: AudioDetectWindow = AudioDetectWindow::new(window.to_vec(), start_index as i32, (end_index as i32)-1);
         audio_windows.push(audio_window);
         start_index = end_index;
     }
 
     if (audio_data.len() % sample_rate as usize) != 0 {
         let window = &audio_data[start_index..(audio_data.len() as usize)];
-        let audio_window: AudioWindow = AudioWindow::new(window.to_vec(), start_index as i32, (audio_data.len()-1).try_into().unwrap());
+        let audio_window: AudioDetectWindow = AudioDetectWindow::new(window.to_vec(), start_index as i32, (audio_data.len()-1).try_into().unwrap());
         audio_windows.push(audio_window);
     }
     return audio_windows;
 }
+
+
 
 #[cfg(test)]
 mod tests {
@@ -196,7 +193,7 @@ mod tests {
     fn test_prepre_data() {
         let mut rng = rand::thread_rng();
         let random_vector: Vec<f32> = (0..100000).map(|_| rng.gen::<f32>()).collect();
-        let result1 = prepare_data(random_vector, 8000);
+        let result1 = prepare_audio_data(random_vector, 8000);
         let test_sample = result1.get(0).unwrap().audio_data.clone();
         let test_sample2 = result1.get(12).unwrap().audio_data.clone();
         assert_eq!(result1.len(), 13);
@@ -204,18 +201,19 @@ mod tests {
         assert_eq!(test_sample2.len(), 4000);
 
         let random_vector2: Vec<f32> = (0..100).map(|_| rng.gen::<f32>()).collect();
-        let result2 = prepare_data(random_vector2, 16000);
+        let result2 = prepare_audio_data(random_vector2, 16000);
         let test_sample3 = result2.get(0).unwrap().audio_data.clone();
         assert_eq!(test_sample3.len(), 100, "Prepare data is not working correctly");
     }
 
     #[test]
     fn test_struct() {
+
         let audio_data = get_audio_wav("files/example.wav").unwrap();
         let audio_data2 = audio_data.clone();
         let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5,).unwrap();
-        let result = silero_model.run_vad(audio_data, 16000).unwrap();
-        let result2 = prepare_data(audio_data2, 16000);
+        let result = silero_model.run_voice_detection(audio_data, 16000).unwrap();
+        let result2 = prepare_audio_data(audio_data2, 16000);
         assert_eq!(result.len(), result2.len());
 
         let expected_outputs: [bool; 35] = [
@@ -231,8 +229,9 @@ mod tests {
 
     #[test]
     fn test_run_vad_wav () {
+
         let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5).unwrap();
-        let result = silero_model.run_vad_wav("files/example.wav");
+        let result = silero_model.run_voice_detection_wav("files/example.wav");
         match result {
             Ok(result) => {
             
@@ -245,16 +244,12 @@ mod tests {
                 for i in 0..result.len() {
                     assert_eq!(result.get(i).unwrap().voice_detect, *expected_outputs.get(i).unwrap(), "run_vad is not outputting the expected values");
                 }
-
             }
-
             Err(_) => {
                 assert_eq!(true, false, "run_vad_wav not working");
             }
         }
-
     }
-
 }
 
 
