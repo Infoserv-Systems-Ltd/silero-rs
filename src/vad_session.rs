@@ -62,7 +62,7 @@ impl VadSession {
             c: Array3::<f32>::zeros((2, 1, 64)),
             detection_threshold,
             session,
-            time_elapsed: 0
+            time_elapsed: 0.0
         })
     }
 
@@ -141,7 +141,7 @@ impl VadSession {
     pub fn reset(&mut self) {
         self.h = Array3::<f32>::zeros((2, 1, 64));
         self.c = Array3::<f32>::zeros((2, 1, 64));
-        self.time_elapsed = 0;
+        self.time_elapsed = 0.0;
     }
 
 }
