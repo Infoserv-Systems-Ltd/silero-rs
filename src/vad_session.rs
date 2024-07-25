@@ -44,7 +44,6 @@ pub struct VadSession {
     h: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     c: ArrayBase<ndarray::OwnedRepr<f32>, ndarray::prelude::Dim<[usize; 3]>>,
     vad_threshold: f32,
-    stateful: bool,
     session: ort::Session,
 }
 
@@ -66,7 +65,6 @@ impl VadSession {
             h: Array3::<f32>::zeros((2, 1, 64)),
             c: Array3::<f32>::zeros((2, 1, 64)),
             vad_threshold,
-            stateful: false,
             session,
         })
     }
@@ -144,11 +142,9 @@ impl VadSession {
         if !(sample_rate == 8000 || sample_rate == 16000) {
             return Err(Error::msg("The sample rate of this audio file is not compatible with Silero, it must be 8000 or 16000 kHz"))
         }
-        if (self.stateful == true) {
-            return self.stateful_vad(aud_array, sample_rate);
-        } else {
-            return self.run_vad(aud_array, sample_rate)
-        }
+        
+        return self.run_vad(aud_array, sample_rate)
+        
     }
 
     pub fn reset(&mut self) {
@@ -206,10 +202,27 @@ impl VadSession {
     }
 
     pub fn stateful_vad_wav(&mut self, file_path: &str) -> Result<Vec<VADResult>, anyhow::Error> {
-        self.stateful = true;
-        let result = self.run_vad_wav(file_path);
-        self.stateful = false;
-        return result;
+        
+        let path = Path::new(&file_path);
+        if !path.exists() {
+            return Err(Error::msg("File can connot be found at the supplied path"))
+        }
+        let mut file = File::open(&file_path)?;
+        let mut header = [0; 4];
+        file.read_exact(&mut header)?;
+        if !(header == *b"RIFF") {
+            return Err(Error::msg("Please use a WAV file"))
+        }
+
+        let mut reader = WavReader::open(file_path)?;
+        let sample_rate: i64 = reader.spec().sample_rate as i64;
+        let aud_array: Vec<i32> = reader.samples::<i32>().map(|x| x.unwrap()).collect::<Vec<_>>();
+        let aud_array: Vec<f32> = aud_array.iter().map(|&x| x as f32).collect();
+
+        if !(sample_rate == 8000 || sample_rate == 16000) {
+            return Err(Error::msg("The sample rate of this audio file is not compatible with Silero, it must be 8000 or 16000 kHz"))
+        }
+        return self.stateful_vad(aud_array, sample_rate)
     }
 }
 
