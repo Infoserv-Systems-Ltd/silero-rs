@@ -1,3 +1,3 @@
 
-pub(crate) mod vad_session;
-pub(crate) mod vad_environment;
+pub mod vad_session;
+pub mod vad_environment;
