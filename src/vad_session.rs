@@ -63,7 +63,6 @@ impl VadSession {
             session,
         })
     }
-  
     pub fn run_voice_detection(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VoiceDetectResult>, anyhow::Error> {
         if !((sample_rate == 8000) || (sample_rate == 16000)) {
             return Err(Error::msg("Sample rate must be 8000 or 16000"))
@@ -71,7 +70,7 @@ impl VadSession {
         let audio_windows: Vec<AudioDetectWindow> = prepare_audio_data(audio_data, sample_rate);
         let h_c_dims = self.h.raw_dim();
         let mut audio_windows_result: Vec<VoiceDetectResult> = Vec::new();
-      
+
         let sample_rate = Array1::from(vec![sample_rate]);
         let mut h = Array3::<f32>::zeros((2, 1, 64));
         let mut c = Array3::<f32>::zeros((2, 1, 64));
@@ -143,7 +142,6 @@ impl VadSession {
     pub fn reset(&mut self) {
         self.h = Array3::<f32>::zeros((2, 1, 64));
         self.c = Array3::<f32>::zeros((2, 1, 64));
-    }
 
     pub fn stateful_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VoiceDetectResult>, anyhow::Error> {
 
@@ -219,6 +217,7 @@ impl VadSession {
     }
 }
 
+}
 
 fn prepare_audio_data(audio_data: Vec<f32>, sample_rate: i64) -> Vec<AudioDetectWindow> {
     let mut audio_windows: Vec<AudioDetectWindow> = Vec::new();

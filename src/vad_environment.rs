@@ -24,7 +24,7 @@ impl VadEnvironment{
             Err(Error::msg("Model can connot be found at the supplied path"))
         }
     }
-  
+
     pub fn new_vad_session(&self, vad_threshold: f32) -> Result<VadSession, anyhow::Error> {
         let vad_session: Result<VadSession, anyhow::Error> = VadSession::new(&self.model_location, vad_threshold);
         return vad_session;
