@@ -323,11 +323,6 @@ mod tests {
             }
         }
     }
-/*
-need tests for:
-stateful
-new structs
- */
     #[test]
     fn test_stateful_interface () {
         let mut silero_model = VadSession::new(&PathBuf::from("files/silero_vad.onnx"), 0.5).unwrap();
