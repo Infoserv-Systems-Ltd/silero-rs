@@ -9,6 +9,7 @@ pub struct VadEnvironment {
 }
 
 impl VadEnvironment{
+  
     pub fn new(model_location: &str) -> Result<Self, anyhow::Error> {
         let path = Path::new(&model_location);
         if path.exists() {
@@ -52,7 +53,7 @@ mod tests {
 
         let path = Path::new("files/silero_vad.onnx");
         assert_eq!(true, path.exists(), "Path not valid");
-        let environment_error = VadEnvironment::new("not a path");
+        let environment_error = VadEnvironment::new("not a path", false, 0.5);
         match environment_error {
             Ok(_) => {
                 assert_eq!(true, false)
