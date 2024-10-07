@@ -10,50 +10,87 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  # build:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Set up toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #         override: true
+
+  #     - name: Build
+  #       uses: actions-rs/cargo@v1
+  #       with:
+  #         command: build
+
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - name: Set up toolchain
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           override: true
 
-      - name: setup
-        run: sudo usermod -aG docker $USER
-
-      - name: linux_version
-        run: lsb_release -a
-
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-
-      - name: Clean workspace
-        uses: actions-rs/cargo@v1
-        with:
-          command: clean
+      # Required to provide source-based code coverage using LLVM
+      - name: Install Clang
+        run: sudo apt install clang -y
 
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --no-fail-fast # Customize args for your own needs
+          args: --all-features
         env:
-          CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "-C instrument-coverage"
           LLVM_PROFILE_FILE: "silero.profraw"
-          # RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cllvm-args=--inline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
-          # RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cllvm-args=--inline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
+          CARGO_INCREMENTAL: "0"
+          RUSTFLAGS: "-Cinstrument-coverage"
+          RUSTDOCFLAGS: "-Cinstrument-coverage"
 
-      - name: Report Test Coverage
-        id: coverage
-        uses: actions-rs/grcov@v0.1
-        with:
-          args: --binary-path="./target/debug" -t coveralls -s . 
+      - name: Install LLVM Tools
+        run: rustup component add llvm-tools-preview
 
-      - name: Coveralls upload
-        uses: coverallsapp/github-action@master
+      # Provisioning grcov explicitly to execute directly with the required args below
+      - name: Install grcov
+        run: cargo install grcov
+
+      - name: Make the directory where Code Coverage will be stored
+        run: mkdir target/debug/coverage
+
+      - name: Gather Code Coverage
+        run: |
+          grcov . \
+            --source-dir . \
+            --binary-path ./target/debug \
+            -t cobertura \
+            --branch \
+            --ignore-not-existing \
+            --ignore "$HOME/.cargo/**" \
+            --ignore "target/debug/build/**" \
+            -o ./target/debug/coverage
+
+      - name: Print coverage directory
+        run: ls -l ./target/debug/coverage
+
+      - name: Code Coverage Summary Report
+        uses: irongut/CodeCoverageSummary@v1.3.0
         with:
-          path-to-lcov: ${{ steps.coverage.outputs.report }}
+          filename: 'target/debug/coverage/cobertura.xml'       
+          badge: true
+          fail_below_min: true
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: '60 80'
+
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md

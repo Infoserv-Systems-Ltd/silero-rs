@@ -148,20 +148,14 @@ Produced by pytorch
 
 # Code Coverage
 
+## LLVM on MacOS
 ```bash
-RUSTFLAGS="-C instrument-coverage" \
-LLVM_PROFILE_FILE="silero.profraw" \
-ORT_STRATEGY=system \
-ORT_LIB_LOCATION="$(pwd)/deps/onnxruntime-osx-arm64-1.19.2/lib" \
+export RUSTFLAGS="-Cinstrument-coverage"
 cargo build
-```
-
-```bash
-xcrun llvm-profdata merge -sparse silero.profraw -o silero.profdata
-```
-
-```bash
-xcrun llvm-profdata show silero.profdata
+export LLVM_PROFILE_FILE="silero-%p-%m.profraw"
+cargo test
+grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/
+open ./target/debug/coverage/index.html
 ```
 
 ## Current Code Coverage Report
