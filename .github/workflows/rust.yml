@@ -27,20 +27,24 @@ jobs:
         run: lsb_release -a
 
       - name: Build
-        run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows \
-            ORT_STRATEGY=system \
-            ORT_LIB_LOCATION=.github/workflows \
-            cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+        env:
+          LD_LIBRARY_PATH: "$LD_LIBRARY_PATH:.github/workflows"
+          ORT_STRATEGY: "system"
+          ORT_LIB_LOCATION: ".github/workflows"
 
       - name: Install LLVM Tools
         run: cargo +stable install cargo-llvm-cov --locked
 
       - name: Run tests
-        run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows \
-            ORT_STRATEGY=system \
-            ORT_LIB_LOCATION=.github/workflows \
-            RUSTFLAGS="-C instrument-coverage" \
-            LLVM_PROFILE_FILE="silero.profraw" \
-            cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: llvm-cov
+        env:
+          LD_LIBRARY_PATH: "$LD_LIBRARY_PATH:.github/workflows"
+          ORT_STRATEGY: "system"
+          ORT_LIB_LOCATION: ".github/workflows"
+          RUSTFLAGS: "-C instrument-coverage"
+          LLVM_PROFILE_FILE: "silero.profraw"
