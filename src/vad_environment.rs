@@ -59,7 +59,7 @@ mod tests {
                 assert_eq!(true, false)
             }
             Err(_) => {
-                assert_eq!(true, false) // Forcing failed assertion here to check that tests are running in Github Actions
+                assert_eq!(true, true)
             }
         }
 
