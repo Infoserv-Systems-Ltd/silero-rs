@@ -23,4 +23,5 @@ ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = [
 #    "cuda"
 ] }
 rand = "0.8.5"
-
+llvm-tools = "0.1.1"
+cargo-llvm-cov = "0.6.13"
