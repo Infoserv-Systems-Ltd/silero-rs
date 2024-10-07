@@ -25,31 +25,15 @@ jobs:
       - name: linux_version
         run: lsb_release -a
 
-      - name: Set up Clang
-        uses: egor-tensin/setup-clang@v1
-        with:
-          version: latest
-          platform: x64
-
       - name: Build
         uses: actions-rs/cargo@v1
         with:
           command: build
-        env:
-          LD_LIBRARY_PATH: "$LD_LIBRARY_PATH:.github/workflows"
-          ORT_STRATEGY: "system"
-          ORT_LIB_LOCATION: ".github/workflows"
 
       - name: Clean workspace
         uses: actions-rs/cargo@v1
         with:
           command: clean
-
-      - name: Print Current Working Directory
-        run: pwd
-
-      - name: Print LD_LIBRARY_PATH
-        run: echo $LD_LIBRARY_PATH
 
       - name: Run tests
         uses: actions-rs/cargo@v1
@@ -57,9 +41,6 @@ jobs:
           command: test
           args: --all-features --no-fail-fast # Customize args for your own needs
         env:
-          LD_LIBRARY_PATH: "$LD_LIBRARY_PATH:.github/workflows"
-          ORT_STRATEGY: "system"
-          ORT_LIB_LOCATION: ".github/workflows"
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "-C instrument-coverage"
           LLVM_PROFILE_FILE: "silero.profraw"
@@ -69,19 +50,10 @@ jobs:
       - name: Report Test Coverage
         id: coverage
         uses: actions-rs/grcov@v0.1
+        with:
+          args: --binary-path="./target/debug" -t coveralls -s . 
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
         with:
           path-to-lcov: ${{ steps.coverage.outputs.report }}
-
-      # - name: Run tests
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: llvm-cov
-      #   env:
-      #     LD_LIBRARY_PATH: "$LD_LIBRARY_PATH:.github/workflows"
-      #     ORT_STRATEGY: "system"
-      #     ORT_LIB_LOCATION: ".github/workflows"
-      #     RUSTFLAGS: "-C instrument-coverage"
-      #     LLVM_PROFILE_FILE: "silero.profraw"
