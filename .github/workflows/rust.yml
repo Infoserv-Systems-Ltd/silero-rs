@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "increase-test-coverage"]
   pull_request:
     branches: ["main"]
 
@@ -28,9 +28,9 @@ jobs:
 
       - name: Build
         run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows
-            ORT_STRATEGY=system
-            ORT_LIB_LOCATION=.github/workflows
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows \
+            ORT_STRATEGY=system \
+            ORT_LIB_LOCATION=.github/workflows \
             cargo build
 
       - name: Install LLVM Tools
@@ -38,9 +38,9 @@ jobs:
 
       - name: Run tests
         run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows
-            ORT_STRATEGY=system
-            ORT_LIB_LOCATION=.github/workflows
-            RUSTFLAGS="-C instrument-coverage"
-            LLVM_PROFILE_FILE="silero.profraw"
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:.github/workflows \
+            ORT_STRATEGY=system \
+            ORT_LIB_LOCATION=.github/workflows \
+            RUSTFLAGS="-C instrument-coverage" \
+            LLVM_PROFILE_FILE="silero.profraw" \
             cargo test
