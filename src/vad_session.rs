@@ -9,10 +9,10 @@ use std::io::Read;
 use hound::WavReader;
 
 pub struct VoiceDetectResult {
-    start_period: i32,
-    end_period: i32,
-    probability: f32,
-    voice_detect: bool
+    pub start_period: i32,
+    pub end_period: i32,
+    pub probability: f32,
+    pub voice_detect: bool
 }
 
 impl VoiceDetectResult{
@@ -26,7 +26,7 @@ impl VoiceDetectResult{
     }
 }
 
-pub struct AudioDetectWindow {
+struct AudioDetectWindow {
     audio_data: Vec<f32>,
     start_period: i32,
     end_period: i32
@@ -63,12 +63,12 @@ impl VadSession {
             session,
         })
     }
+
     pub fn run_voice_detection(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VoiceDetectResult>, anyhow::Error> {
         if !((sample_rate == 8000) || (sample_rate == 16000)) {
             return Err(Error::msg("Sample rate must be 8000 or 16000"))
         }
         let audio_windows: Vec<AudioDetectWindow> = prepare_audio_data(audio_data, sample_rate);
-        let h_c_dims = self.h.raw_dim();
         let mut audio_windows_result: Vec<VoiceDetectResult> = Vec::new();
 
         let sample_rate = Array1::from(vec![sample_rate]);
@@ -138,10 +138,6 @@ impl VadSession {
         }
         return self.run_voice_detection(aud_array, sample_rate)
     }
-
-    pub fn reset(&mut self) {
-        self.h = Array3::<f32>::zeros((2, 1, 64));
-        self.c = Array3::<f32>::zeros((2, 1, 64));
 
     pub fn stateful_vad(&mut self, audio_data: Vec<f32>, sample_rate: i64) -> Result<Vec<VoiceDetectResult>, anyhow::Error> {
 
@@ -215,9 +211,14 @@ impl VadSession {
         }
         return self.stateful_vad(aud_array, sample_rate)
     }
+
+    pub fn reset(&mut self) {
+        self.h = Array3::<f32>::zeros((2, 1, 64));
+        self.c = Array3::<f32>::zeros((2, 1, 64));
+    }
 }
 
-}
+
 
 fn prepare_audio_data(audio_data: Vec<f32>, sample_rate: i64) -> Vec<AudioDetectWindow> {
     let mut audio_windows: Vec<AudioDetectWindow> = Vec::new();
