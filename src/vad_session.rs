@@ -54,7 +54,7 @@ impl VadSession {
         let session = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level1)?
             .with_intra_threads(1)?
-            .with_model_from_file(&model_location)?;
+            .commit_from_file(&model_location)?;
 
         Ok(Self {
             h: Array3::<f32>::zeros((2, 1, 64)),
@@ -80,20 +80,20 @@ impl VadSession {
 
             let input_audio = ndarray::Array1::from_iter(window.audio_data.iter().cloned());
             let input_audio = input_audio.view().insert_axis(Axis(0));
-            let window_outputs: &ort::SessionOutputs<'_> = &self.session.run(inputs![
+            let window_outputs: &ort::SessionOutputs<'_, '_> = &self.session.run(ort::inputs![
                 input_audio,
                 sample_rate.clone(),
                 h.clone(),
                 c.clone()
             ]?)?;
 
-            let window_output: Tensor<f32> = window_outputs["output"].extract_tensor()?;
+            let window_output: ArrayViewD<f32> = window_outputs["output"].try_extract_tensor()?;
             let window_output: Vec<f32> = window_output.view().iter().copied().collect();
 
-            let hn: Tensor<f32> = window_outputs["hn"].extract_tensor()?;
+            let hn: ArrayViewD<f32> = window_outputs["hn"].try_extract_tensor()?;
             let hn: Vec<f32> = hn.view().iter().copied().collect();
 
-            let cn: Tensor<f32> = window_outputs["cn"].extract_tensor()?;
+            let cn: ArrayViewD<f32> = window_outputs["cn"].try_extract_tensor()?;
             let cn: Vec<f32> = cn.view().iter().copied().collect();
 
             h = Array3::from_shape_vec((h_c_dims[0], h_c_dims[1], h_c_dims[2]), hn).unwrap();
@@ -154,20 +154,20 @@ impl VadSession {
 
             let input_audio = ndarray::Array1::from_iter(window.audio_data.iter().cloned());
             let input_audio = input_audio.view().insert_axis(Axis(0));
-            let window_outputs: &ort::SessionOutputs<'_> = &self.session.run(inputs![
+            let window_outputs: &ort::SessionOutputs<'_, '_> = &self.session.run(inputs![
                 input_audio,
                 sample_rate.clone(),
                 self.h.clone(),
                 self.c.clone() 
             ]?)?;
 
-            let window_output: Tensor<f32> = window_outputs["output"].extract_tensor()?;
+            let window_output: ArrayViewD<f32> = window_outputs["output"].try_extract_tensor()?;
             let window_output: Vec<f32> = window_output.view().iter().copied().collect();
 
-            let hn: Tensor<f32> = window_outputs["hn"].extract_tensor()?;
+            let hn: ArrayViewD<f32> = window_outputs["hn"].try_extract_tensor()?;
             let hn: Vec<f32> = hn.view().iter().copied().collect();
 
-            let cn: Tensor<f32> = window_outputs["cn"].extract_tensor()?;
+            let cn: ArrayViewD<f32> = window_outputs["cn"].try_extract_tensor()?;
             let cn: Vec<f32> = cn.view().iter().copied().collect();
 
             self.h = Array3::from_shape_vec((h_c_dims[0], h_c_dims[1], h_c_dims[2]), hn).unwrap();

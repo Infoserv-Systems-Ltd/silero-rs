@@ -9,19 +9,10 @@ repository = "https://github.com/Infoserv-Systems-Ltd/sileror-rs"
 
 [dependencies]
 anyhow = "1.0.79"
-clap = { version = "4.4.18", features = ["derive"] }
+clap = { version = "4.5.19", features = ["derive"] }
 hound = "3.5.1"
-ndarray = { version = "0.15" }
-# enable the line below when v2 of ORT is released
-# ort = {version = "2.0.0"}
-# or
-# ort = {version = "2.0.0", features = [ "fetch-models" ] }
-# not sure if the ndarray is needed below.....
-ort = { git = "https://github.com/pykeio/ort", branch = "v2", features = [
-    "fetch-models",
-    "ndarray",
-#    "cuda"
-] }
+ort = "=2.0.0-rc.6"
+ndarray = "0.16.1"
 rand = "0.8.5"
 llvm-tools = "0.1.1"
 grcov = "0.8.19"
