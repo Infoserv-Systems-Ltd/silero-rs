@@ -45,7 +45,7 @@ jobs:
           command: test
           args: --all-features
         env:
-          LLVM_PROFILE_FILE: "silero.profraw"
+          LLVM_PROFILE_FILE: "target/debug/silero.profraw"
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "-Cinstrument-coverage"
           RUSTDOCFLAGS: "-Cinstrument-coverage"
