@@ -1,8 +1,11 @@
 name: Rust
 
+permissions:
+  pull-requests: write
+
 on:
   push:
-    branches: ["main", "increase-test-coverage"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
