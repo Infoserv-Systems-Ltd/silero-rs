@@ -1,0 +1,10 @@
+
+
+segmented_stt:
+  model_path: models/ggml-base.en.bin
+  threads: 6
+  audio_chunk_size_secs: 6
+  greedy_best_of: 6
+
+tracing:
+  level: debug
