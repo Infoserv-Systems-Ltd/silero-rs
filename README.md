@@ -1,5 +1,7 @@
 # silero-rs - A Rust wrapper for the Silero C++ library
 
+![GitHub Actions Badge](https://github.com/Infoserv-Systems-Ltd/silero-rs/actions/workflows/rust.yml/badge.svg)
+
 This library provides a wrapper to use Silero voice activation detection in rust. Silero is a neural network that can detect whether recorded audio contains human speech. It does this by being fed small sections of the audio and returning a probability for each section as to whether it contains human speech. This library works directly with WAV files, any other file type must first have the audio data extracted. Silero is run using onnxruntime, this is possible due to the onnxruntime_rs crate that provides a wrapper in rust for onnxruntime.
 
 ## Usage
@@ -129,12 +131,37 @@ where <MODEL> is the path to the Silero model and <AUDIO> is the path to the aud
 Silero Meta Data
 Name: torch_jit
 Produced by pytorch
-Inputs:
-0 input: Tensor<f32>(dyn, dyn)
-1 sr: Tensor<i64>()
-2 h: Tensor<f32>(2, dyn, 64)
-3 c: Tensor<f32>(2, dyn, 64)
-Outputs:
-0 output: Tensor<f32>(dyn, 1)
-1 hn: Tensor<f32>(2, dyn, 64)
-2 cn: Tensor<f32>(2, dyn, 64)
+
+|Inputs:|
+|---|
+|0 input: Tensor<f32>(dyn, dyn)|
+|1 sr: Tensor<i64>()|
+|2 h: Tensor<f32>(2, dyn, 64)|
+|3 c: Tensor<f32>(2, dyn, 64)|
+
+|Outputs:|
+|---|
+|0 output: Tensor<f32>(dyn, 1)|
+|1 hn: Tensor<f32>(2, dyn, 64)|
+|2 cn: Tensor<f32>(2, dyn, 64)|
+
+
+# Code Coverage
+
+## LLVM on MacOS
+```bash
+export RUSTFLAGS="-Cinstrument-coverage"
+cargo build
+export LLVM_PROFILE_FILE="silero-%p-%m.profraw"
+cargo test
+grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./target/debug/coverage/
+open ./target/debug/coverage/index.html
+```
+
+## Current Code Coverage Report
+
+|Filename                     | Regions  |  Missed Regions  |   Cover  | Functions | Missed Functions | Executed   |    Lines   |   Missed Lines  |   Cover   | Branches  | Missed Branches   |
+|-----------------------------|----------|------------------|----------|-----------|------------------|------------|------------|-----------------|-----------|-----------|-------------------|
+|vad_environment.rs           |      24  |              14  |  41.67%  |         6 |                4 |   33.33%   |       40   |             17  |  57.50%   |        0  |               0   |
+|vad_session.rs               |     178  |              39  |  78.09%  |        24 |                1 |   95.83%   |      259   |             17  |  93.44%   |        0  |               0   |
+|TOTAL                        |     202  |              53  |  73.76%  |        30 |                5 |   83.33%   |      299   |             34  |  88.63%   |        0  |               0   |
